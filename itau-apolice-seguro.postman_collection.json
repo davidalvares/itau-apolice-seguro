@@ -1,0 +1,188 @@
+{
+    "info": {
+        "_postman_id": "b3e04e9c-1f4a-4b9a-9e1d-8f7a6c5b4d3e",
+        "name": "Itau Apolice Seguro",
+        "description": "Coleção de testes para o microsserviço de Apólices de Seguro",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Criar Solicitação (Sucesso - Auto)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "var jsonData = pm.response.json();",
+                            "pm.environment.set(\"id_apolice\", jsonData.id);",
+                            "pm.test(\"Status code is 201\", function () {",
+                            "    pm.response.to.have.status(201);",
+                            "});",
+                            "pm.test(\"Status is PENDENTE\", function () {",
+                            "    pm.expect(jsonData.status).to.eql(\"PENDENTE\");",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"idCliente\": \"adc56d77-348c-4bf0-908f-22d402ee715c\",\n  \"idProduto\": \"1b2da7cc-b367-4196-8a78-9cfeec21f587\",\n  \"categoria\": \"AUTO\",\n  \"canalVenda\": \"MOBILE\",\n  \"formaPagamento\": \"CARTAO_CREDITO\",\n  \"valorPremioMensalTotal\": 75.25,\n  \"valorSegurado\": 100000.00,\n  \"coberturas\": { \"Roubo\": 100000.00, \"Colisao\": 50000.00 },\n  \"assistencias\": [ \"Guincho\", \"Carro Reserva\" ]\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/solicitacoes",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "solicitacoes"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "2. Criar Solicitação (Sucesso - Vida)",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"idCliente\": \"adc56d77-348c-4bf0-908f-22d402ee715c\",\n  \"idProduto\": \"2c3da8dd-c478-5207-9b89-0dfffd32f698\",\n  \"categoria\": \"VIDA\",\n  \"canalVenda\": \"WEBSITE\",\n  \"formaPagamento\": \"PIX\",\n  \"valorPremioMensalTotal\": 45.00,\n  \"valorSegurado\": 200000.00,\n  \"coberturas\": { \"Morte Natural\": 200000.00 },\n  \"assistencias\": [ \"Funeral\" ]\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/solicitacoes",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "solicitacoes"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "3. Criar Solicitação (Rejeição - Valor Muito Alto)",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "var jsonData = pm.response.json();",
+                            "pm.test(\"Status is REJEITADO\", function () {",
+                            "    pm.expect(jsonData.status).to.eql(\"REJEITADO\");",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"idCliente\": \"adc56d77-348c-4bf0-908f-22d402ee715c\",\n  \"idProduto\": \"1b2da7cc-b367-4196-8a78-9cfeec21f587\",\n  \"categoria\": \"AUTO\",\n  \"canalVenda\": \"MOBILE\",\n  \"formaPagamento\": \"CARTAO_CREDITO\",\n  \"valorPremioMensalTotal\": 500.00,\n  \"valorSegurado\": 900000.00,\n  \"coberturas\": { \"Roubo\": 900000.00 },\n  \"assistencias\": [ \"Guincho\" ]\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{base_url}}/solicitacoes",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "solicitacoes"
+                    ]
+                },
+                "description": "Tenta criar apólice com valor acima do limite (350k para Auto Regular), devendo ser rejeitada."
+            },
+            "response": []
+        },
+        {
+            "name": "4. Buscar Por ID",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/solicitacoes/{{id_apolice}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "solicitacoes",
+                        "{{id_apolice}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "5. Buscar Por Cliente",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/solicitacoes/cliente/adc56d77-348c-4bf0-908f-22d402ee715c",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "solicitacoes",
+                        "cliente",
+                        "adc56d77-348c-4bf0-908f-22d402ee715c"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "6. Cancelar Solicitação",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/solicitacoes/{{id_apolice}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "solicitacoes",
+                        "{{id_apolice}}"
+                    ]
+                }
+            },
+            "response": []
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8080",
+            "type": "string"
+        },
+        {
+            "key": "id_apolice",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

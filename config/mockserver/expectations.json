@@ -1,0 +1,22 @@
+[
+    {
+        "httpRequest": {
+            "method": "GET",
+            "path": "/analyze/.*",
+            "queryStringParameters": {
+                "orderId": [
+                    ".*"
+                ]
+            }
+        },
+        "httpResponse": {
+            "statusCode": 200,
+            "body": "{\"classification\": \"REGULAR\", \"occurrences\": []}",
+            "headers": {
+                "Content-Type": [
+                    "application/json"
+                ]
+            }
+        }
+    }
+]
