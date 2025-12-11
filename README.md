@@ -15,7 +15,7 @@ Este projeto implementa um microsserviço para gestão de solicitações de apó
 ## Arquitetura
 
 O sistema gerencia o ciclo de vida da apólice através dos seguintes estados:
-`RECEIVED` -> `VALIDATED` -> `PENDING` -> `APPROVED` (ou `REJECTED`/`CANCELED`)
+`RECEBIDO` -> `VALIDADO` -> `PENDENTE` -> `APROVADO` (ou `REJEITADO`/`CANCELADO`)
 
 ### Integrações
 - **API de Fraudes**: Consultada via HTTP (Feign) para classificar o risco do cliente.
@@ -40,17 +40,34 @@ O sistema gerencia o ciclo de vida da apólice através dos seguintes estados:
    ```
    *Nota: Caso ocorram erros de dependência, tente `./mvnw -U clean install -DskipTests`.*
 
+3. **Executar Testes Unitários**
+   Para rodar a suíte de testes automatizados (unitários e mocks):
+   ```bash
+   ./mvnw test
+   ```
+
+## Simulação Automática de Eventos
+
+O projeto agora inclui um **Job Agendado** (`SimuladorEventosExternosJob`) que roda a cada 10 segundos.
+Este job busca apólices com status `PENDENTE` e simula automaticamente as respostas dos sistemas externos:
+
+1. **Envio de Pagamento**: Simula um evento de pagamento (`CONFIRMED` com 80% de chance).
+2. **Autorização de Subscrição**: Se pago, simula um evento de subscrição (`AUTHORIZED` com 90% de chance).
+
+Isso significa que você não precisa mais postar mensagens no Kafka manualmente para ver uma apólice ser aprovada. Basta criá-la via API e aguardar alguns segundos.
+
 ## API Endpoints
 
 - **POST /solicitacoes**: Cria uma nova solicitação.
 - **GET /solicitacoes/{id}**: Consulta uma solicitação.
+- **GET /solicitacoes/cliente/{idCliente}**: Consulta apólices de um cliente.
 - **DELETE /solicitacoes/{id}**: Cancela uma solicitação.
 
-## Testando
+## Mão na Massa
 
 ### 1. Criar Solicitação
 ```http
-POST http://localhost:8080/solicitacoes
+POST http://localhost:8081/solicitacoes
 Content-Type: application/json
 
 {
@@ -66,22 +83,9 @@ Content-Type: application/json
 }
 ```
 
-### 2. Simular Pagamento (Kafka)
-Produza uma mensagem no tópico `payment-events`:
-```json
-{
-  "idApolice": "<ID_DA_APOLICE_UUID>",
-  "status": "CONFIRMED"
-}
-```
+### 2. Acompanhar Status
+Use o **ID** retornado na criação para consultar o estado. Você verá ele transitar automaticamente de `RECEBIDO` para `PENDENTE` e, em seguida (pelo job), para `APROVADO` ou `REJEITADO`.
 
-### 3. Simular Subscrição (Kafka)
-Produza uma mensagem no tópico `subscription-events`:
-```json
-{
-  "idApolice": "<ID_DA_APOLICE_UUID>",
-  "status": "AUTHORIZED"
-}
+```http
+GET http://localhost:8081/solicitacoes/{id}
 ```
-
-Ao final, o status da apólice deve ser `APPROVED`.
