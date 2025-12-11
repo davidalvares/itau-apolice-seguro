@@ -10,16 +10,31 @@ Este projeto é uma solução robusta e orientada a eventos para gerenciar todo 
 
 O sistema adota uma arquitetura reativa para garantir escalabilidade e resiliência.
 
-### O Fluxo da Apólice ("A Jornada")
+### 🔍 Detalhes do Fluxo ("A Jornada da Apólice")
 
-Uma apólice passa por diversos estados. Aqui está o caminho feliz:
+Abaixo, detalhamos o que acontece "por baixo do capô" em cada etapa:
 
-1.  📥 **RECEBIDO**: O cliente envia a solicitação via API REST.
-2.  🔍 **VALIDADO**: O sistema consulta *automaticamente* uma API externa de Fraudes. Com base no risco retornado (ex: `REGULAR`, `HIGH_RISK`), aplicamos regras de negócio sobre o valor segurado.
-3.  ⏳ **PENDENTE**: Se aprovada na validação, a apólice fica aguardando processamento externo.
-4.  💳 **Pagamento (Async)**: O sistema escuta eventos de confirmação de pagamento.
-5.  ✍️ **Subscrição (Async)**: O sistema escuta eventos de autorização da subscrição.
-6.  ✅ **APROVADO**: Somente após pagamento confirmado E subscrição autorizada, a apólice é efetivada.
+1.  📥 **Solicitação (REST API)**
+    *   **O que acontece**: O client chama `POST /solicitacoes`.
+    *   **Técnico**: O `SolicitacaoApoliceController` recebe o DTO, converte para entidade e o `SolicitacaoApoliceService` persiste no banco com status `RECEBIDO`.
+
+2.  🛡️ **Validação de Fraude & Regras**
+    *   **O que acontece**: Verificamos se o cliente é confiável e se o valor segurado está dentro do permitido.
+    *   **Técnico**:
+        *   Chamada síncrona via **OpenFeign** para a API de Fraudes.
+        *   O `ServicoValidacaoApolice` compara o risco retornado com a tabela de limites (ver abaixo).
+        *   **Sucesso**: Status muda para `VALIDADO` -> `PENDENTE`.
+        *   **Falha**: Status muda para `REJEITADO`.
+
+3.  📡 **Eventos Assíncronos (Kafka)**
+    *   O sistema não trava esperando pagamento ou subscrição. Ele reage a eventos!
+    *   **Pagamento**: O consumidor escuta o tópico `payment-events`. Se confirmado, marca flag `pago=true`.
+    *   **Subscrição**: O consumidor escuta o tópico `subscription-events`. Se autorizado, marca flag `subscrito=true`.
+
+4.  🏁 **Aprovação Final**
+    *   Toda vez que um evento (pagamento ou subscrição) é processado, o serviço verifica:
+    *   *"Está pago? Sim. Está subscrito? Sim. Foi rejeitado? Não."*
+    *   Se tudo ok, o status final muda para `APROVADO` ✅.
 
 ---
 
