@@ -12,6 +12,7 @@ import com.itau.seguro.app.infrastructure.persistence.SolicitacaoApoliceReposito
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -48,8 +50,9 @@ class SolicitacaoApoliceServiceTest {
         @DisplayName("Deve criar solicitação com sucesso e status PENDENTE quando validado")
         void deveCriarSolicitacaoComSucesso() {
                 // Arrange
+                UUID idCliente = UUID.randomUUID();
                 CriarSolicitacaoDTO dto = new CriarSolicitacaoDTO(
-                                UUID.randomUUID(), "prod1", CategoriaProduto.AUTO, CanalVenda.MOBILE,
+                                idCliente, "prod1", CategoriaProduto.AUTO, CanalVenda.MOBILE,
                                 FormaPagamento.CARTAO_CREDITO,
                                 BigDecimal.TEN, BigDecimal.valueOf(10000), Collections.emptyMap(),
                                 Collections.emptyList());
@@ -60,7 +63,10 @@ class SolicitacaoApoliceServiceTest {
                                 .status(StatusSolicitacao.RECEBIDO)
                                 .build();
 
+                // Mocking save to return the same instance to simulate JPA behavior loosely but
+                // we capture the state changes
                 when(repositorio.save(any(SolicitacaoApolice.class))).thenReturn(apoliceSalva);
+
                 when(portaIntegracaoFraude.analisarRisco(any(), any())).thenReturn(new RespostaAnaliseFraude(
                                 UUID.randomUUID(),
                                 dto.idCliente(), LocalDateTime.now(), "REGULAR", Collections.emptyList()));
@@ -73,7 +79,10 @@ class SolicitacaoApoliceServiceTest {
                 assertNotNull(response);
                 assertEquals(apoliceSalva.getId(), response.id());
 
-                // Verifica transições de status: RECEBIDO -> VALIDADO -> PENDENTE
+                // Verify final state
+                assertEquals(StatusSolicitacao.PENDENTE, apoliceSalva.getStatus());
+
+                // Verify interactions
                 verify(repositorio, atLeast(2)).save(any(SolicitacaoApolice.class));
                 verify(produtorEventos, atLeast(1)).publicarMudancaEstado(any(EventoMudancaEstadoApolice.class));
         }
@@ -100,7 +109,8 @@ class SolicitacaoApoliceServiceTest {
 
                 service.criar(dto);
 
-                verify(repositorio, times(1)).save(argThat(a -> a.getStatus() == StatusSolicitacao.REJEITADO));
+                assertEquals(StatusSolicitacao.REJEITADO, apoliceSalva.getStatus());
+                verify(repositorio, atLeast(2)).save(any(SolicitacaoApolice.class));
         }
 
         @Test
@@ -122,7 +132,28 @@ class SolicitacaoApoliceServiceTest {
         }
 
         @Test
-        @DisplayName("Deve aprovar apólice quando paga e subscrita")
+        @DisplayName("Deve rejeitar apólice se pagamento falhar")
+        void deveRejeitarPagamento() {
+                UUID idApolice = UUID.randomUUID();
+                SolicitacaoApolice apolice = SolicitacaoApolice.builder()
+                                .id(idApolice)
+                                .status(StatusSolicitacao.PENDENTE)
+                                .pago(false)
+                                .build();
+
+                when(repositorio.findById(idApolice)).thenReturn(Optional.of(apolice));
+
+                service.processarConfirmacaoPagamento(idApolice, false);
+
+                assertFalse(apolice.isPago());
+                assertEquals(StatusSolicitacao.REJEITADO, apolice.getStatus());
+                verify(repositorio).save(apolice);
+                verify(produtorEventos)
+                                .publicarMudancaEstado(argThat(e -> e.getStatus() == StatusSolicitacao.REJEITADO));
+        }
+
+        @Test
+        @DisplayName("Deve aprovar apólice quando paga e então subscrita")
         void deveAprovarApoliceFull() {
                 UUID idApolice = UUID.randomUUID();
                 SolicitacaoApolice apolice = SolicitacaoApolice.builder()
@@ -141,5 +172,61 @@ class SolicitacaoApoliceServiceTest {
                 assertTrue(apolice.isSubscrito());
                 assertEquals(StatusSolicitacao.APROVADO, apolice.getStatus());
                 verify(repositorio, times(2)).save(apolice); // Salva subscrito, depois salva aprovado
+                // Deve publicar evento de APROVADO
+                verify(produtorEventos, atLeastOnce())
+                                .publicarMudancaEstado(argThat(e -> e.getStatus() == StatusSolicitacao.APROVADO));
+        }
+
+        @Test
+        @DisplayName("Deve cancelar apólice pendente com sucesso")
+        void deveCancelarApolicePendente() {
+                UUID idApolice = UUID.randomUUID();
+                SolicitacaoApolice apolice = SolicitacaoApolice.builder()
+                                .id(idApolice)
+                                .status(StatusSolicitacao.PENDENTE)
+                                .build();
+
+                when(repositorio.findById(idApolice)).thenReturn(Optional.of(apolice));
+
+                service.cancelar(idApolice);
+
+                assertEquals(StatusSolicitacao.CANCELADO, apolice.getStatus());
+                verify(repositorio).save(apolice);
+                verify(produtorEventos)
+                                .publicarMudancaEstado(argThat(e -> e.getStatus() == StatusSolicitacao.CANCELADO));
+        }
+
+        @Test
+        @DisplayName("Deve falhar ao cancelar apólice já finalizada")
+        void deveFalharCancelarApoliceFinalizada() {
+                UUID idApolice = UUID.randomUUID();
+                SolicitacaoApolice apolice = SolicitacaoApolice.builder()
+                                .id(idApolice)
+                                .status(StatusSolicitacao.APROVADO)
+                                .build();
+
+                when(repositorio.findById(idApolice)).thenReturn(Optional.of(apolice));
+
+                assertThrows(RuntimeException.class, () -> service.cancelar(idApolice));
+                verify(repositorio, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve buscar apólices por cliente")
+        void deveBuscarPorCliente() {
+                UUID idCliente = UUID.randomUUID();
+                SolicitacaoApolice apolice = SolicitacaoApolice.builder()
+                                .id(UUID.randomUUID())
+                                .idCliente(idCliente)
+                                .status(StatusSolicitacao.APROVADO)
+                                .build();
+
+                when(repositorio.findByIdCliente(idCliente)).thenReturn(List.of(apolice));
+
+                List<SolicitacaoResponseDTO> resultado = service.buscarPorIdCliente(idCliente);
+
+                assertFalse(resultado.isEmpty());
+                assertEquals(1, resultado.size());
+                assertEquals(apolice.getId(), resultado.get(0).id());
         }
 }
