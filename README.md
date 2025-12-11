@@ -1,91 +1,124 @@
-# Microsserviço de Apólices de Seguros
+# 🛡️ Microsserviço de Apólices de Seguros - Itaú Challenge
 
-Este projeto implementa um microsserviço para gestão de solicitações de apólices de seguros, utilizando arquitetura orientada a eventos (EDA).
+Bem-vindo ao serviço de Orquestração de Apólices de Seguros! 🚀
 
-## Tecnologias
+Este projeto é uma solução robusta e orientada a eventos para gerenciar todo o ciclo de vida de uma apólice de seguro, desde a solicitação inicial até a aprovação final, integrando verificação de fraudes, validação de regras de negócio, pagamentos e subscrição.
 
-- **Java 17**
-- **Spring Boot 3.x**
-- **Spring Data JPA (MySQL)**
-- **Spring Kafka**
-- **Spring Cloud OpenFeign**
-- **Docker & Docker Compose**
-- **MockServer** (Simulação de API de Fraudes)
+---
 
-## Arquitetura
+## 🏗️ Arquitetura & Fluxo
 
-O sistema gerencia o ciclo de vida da apólice através dos seguintes estados:
-`RECEBIDO` -> `VALIDADO` -> `PENDENTE` -> `APROVADO` (ou `REJEITADO`/`CANCELADO`)
+O sistema adota uma arquitetura reativa para garantir escalabilidade e resiliência.
 
-### Integrações
-- **API de Fraudes**: Consultada via HTTP (Feign) para classificar o risco do cliente.
-- **Pagamentos e Subscrição**: Processados via eventos Kafka (`payment-events`, `subscription-events`).
-- **Eventos de Domínio**: Publicados no tópico `policy-events` a cada mudança de estado.
+### O Fluxo da Apólice ("A Jornada")
 
-## Como Executar
+Uma apólice passa por diversos estados. Aqui está o caminho feliz:
 
-1. **Subir a Infraestrutura**
-   ```bash
-   docker-compose up -d
-   ```
-   Isso iniciará:
-   - MySQL (Porta 3306)
-   - Kafka (Porta 9092)
-   - Zookeeper (Porta 2181)
-   - MockServer (Porta 1080)
+1.  📥 **RECEBIDO**: O cliente envia a solicitação via API REST.
+2.  🔍 **VALIDADO**: O sistema consulta *automaticamente* uma API externa de Fraudes. Com base no risco retornado (ex: `REGULAR`, `HIGH_RISK`), aplicamos regras de negócio sobre o valor segurado.
+3.  ⏳ **PENDENTE**: Se aprovada na validação, a apólice fica aguardando processamento externo.
+4.  💳 **Pagamento (Async)**: O sistema escuta eventos de confirmação de pagamento.
+5.  ✍️ **Subscrição (Async)**: O sistema escuta eventos de autorização da subscrição.
+6.  ✅ **APROVADO**: Somente após pagamento confirmado E subscrição autorizada, a apólice é efetivada.
 
-2. **Compilar e Executar a Aplicação**
-   ```bash
-   ./mvnw clean spring-boot:run
-   ```
-   *Nota: Caso ocorram erros de dependência, tente `./mvnw -U clean install -DskipTests`.*
+---
 
-3. **Executar Testes Unitários**
-   Para rodar a suíte de testes automatizados (unitários e mocks):
-   ```bash
-   ./mvnw test
-   ```
+## 🧠 Regras de Negócio Inteligentes
 
-## Simulação Automática de Eventos
+O coração do sistema é o motor de validação. Dependendo da classificação de risco do cliente (retornada pela API de Fraudes), limites diferentes de **Valor Segurado** são aplicados:
 
-O projeto agora inclui um **Job Agendado** (`SimuladorEventosExternosJob`) que roda a cada 10 segundos.
-Este job busca apólices com status `PENDENTE` e simula automaticamente as respostas dos sistemas externos:
+| Categoria do Produto | 🟢 Regular (Limite) | 🟡 High Risk (Limite) | 🔵 Preferential (Limite) | ⚪ No Info (Limite) |
+| :--- | :--- | :--- | :--- | :--- |
+| **AUTO** | R$ 350.000,00 | R$ 250.000,00 | R$ 449.999,00 | R$ 75.000,00 |
+| **VIDA** | R$ 500.000,00 | R$ 125.000,00 | R$ 799.999,00 | R$ 200.000,00 |
+| **RESIDENCIAL** | R$ 500.000,00 | R$ 150.000,00 | R$ 449.999,00 | N/A |
+| **OUTROS** | R$ 255.000,00 | N/A | R$ 375.000,00 | R$ 55.000,00 |
 
-1. **Envio de Pagamento**: Simula um evento de pagamento (`CONFIRMED` com 80% de chance).
-2. **Autorização de Subscrição**: Se pago, simula um evento de subscrição (`AUTHORIZED` com 90% de chance).
+*Se o valor solicitado exceder o limite para o perfil de risco, a apólice é automaticamente **REJEITADA**.*
 
-Isso significa que você não precisa mais postar mensagens no Kafka manualmente para ver uma apólice ser aprovada. Basta criá-la via API e aguardar alguns segundos.
+---
 
-## API Endpoints
+## 🛠️ Tech Stack
 
-- **POST /solicitacoes**: Cria uma nova solicitação.
-- **GET /solicitacoes/{id}**: Consulta uma solicitação.
-- **GET /solicitacoes/cliente/{idCliente}**: Consulta apólices de um cliente.
-- **DELETE /solicitacoes/{id}**: Cancela uma solicitação.
+*   **Java 17 & Spring Boot 3**: Performance e produtividade.
+*   **MySQL**: Persistência relacional robusta.
+*   **Apache Kafka**: Backbone de eventos para pagamentos e subscrição.
+*   **OpenFeign**: Cliente HTTP declarativo para integração com API de Fraudes.
+*   **Docker Compose**: Ambiente de desenvolvimento completo em um comando.
 
-## Mão na Massa
+---
 
-### 1. Criar Solicitação
-```http
-POST http://localhost:8081/solicitacoes
-Content-Type: application/json
+## 🚀 Como Rodar
 
-{
+### 1. Preparar o Ambiente
+Certifique-se de ter Docker e Java 17 instalados.
+Suba os serviços de dependência (MySQL, Kafka, Zookeeper, MockServer):
+
+```bash
+docker-compose up -d
+```
+
+### 2. Iniciar a Aplicação
+```bash
+./mvnw clean spring-boot:run
+```
+*A aplicação iniciará na porta `8081`.*
+
+### 3. Executar Testes
+Para garantir que tudo está funcionando (incluindo as regras de validação acima):
+```bash
+./mvnw test
+```
+
+---
+
+## 🎮 Simulando o Sistema
+
+Para facilitar os testes, o sistema possui um **"Simulador Automático"** embutido (`SimuladorEventosExternosJob`).
+
+Você não precisa configurar ferramentas complexas de Kafka para ver a mágica acontecer.
+1.  **Crie uma Solicitação** via API.
+2.  **Aguarde**: O Job roda a cada 10 segundos.
+    *   Ele detecta apólices `PENDENTE`.
+    *   Simula um pagamento (`CONFIRMED` ✅ ou `REJECTED` ❌).
+    *   Simula uma subscrição (`AUTHORIZED` ✅ ou `DENIED` ❌).
+3.  **Consulte** o status final.
+
+### Exemplo de Requisição (CURL)
+
+**Criar uma Apólice de Câmbio Automático (Perfil Regular)**
+```bash
+curl -X POST http://localhost:8081/solicitacoes \
+  -H "Content-Type: application/json" \
+  -d '{
   "idCliente": "adc56d77-348c-4bf0-908f-22d402ee715c",
-  "idProduto": "1b2da7cc-b367-4196-8a78-9cfeec21f587",
+  "idProduto": "prod-001",
   "categoria": "AUTO",
   "canalVenda": "MOBILE",
   "formaPagamento": "CARTAO_CREDITO",
-  "valorPremioMensalTotal": 75.25,
-  "valorSegurado": 100000.00,
-  "coberturas": { "Roubo": 100000.00 },
-  "assistencias": [ "Guincho" ]
-}
+  "valorPremioMensalTotal": 150.00,
+  "valorSegurado": 80000.00,
+  "coberturas": { "Colisao": 80000.00 },
+  "assistencias": [ "Guincho 24h", "Carro Reserva" ]
+}'
 ```
 
-### 2. Acompanhar Status
-Use o **ID** retornado na criação para consultar o estado. Você verá ele transitar automaticamente de `RECEBIDO` para `PENDENTE` e, em seguida (pelo job), para `APROVADO` ou `REJEITADO`.
-
-```http
-GET http://localhost:8081/solicitacoes/{id}
+**Verificar Status** (Substitua `{id}` pelo UUID retornado):
+```bash
+curl http://localhost:8081/solicitacoes/{id}
 ```
+
+---
+
+## 📨 API Reference
+
+| Método | Endpoint | Descrição |
+| :--- | :--- | :--- |
+| `POST` | `/solicitacoes` | Cria uma nova solicitação de apólice. |
+| `GET` | `/solicitacoes/{id}` | Busca detalhes e status atual de uma apólice. |
+| `GET` | `/solicitacoes/cliente/{idCliente}` | Lista todas as apólices de um cliente específico. |
+| `DELETE` | `/solicitacoes/{id}` | Cancela uma apólice (se ainda não finalizada). |
+
+---
+
+Desenvolvido para o Desafio de Engenharia de Software - Seguradora.
