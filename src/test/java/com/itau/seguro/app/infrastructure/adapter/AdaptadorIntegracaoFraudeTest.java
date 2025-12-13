@@ -41,4 +41,16 @@ class AdaptadorIntegracaoFraudeTest {
         assertEquals(respostaEsperada, resultado);
         verify(clienteFraude).analisarRisco(idCliente, idSolicitacao);
     }
+
+    @Test
+    @DisplayName("Deve propagar exceção quando o cliente falhar")
+    void devePropagarExcecaoQuandoClienteFalha() {
+        UUID idCliente = UUID.randomUUID();
+        UUID idSolicitacao = UUID.randomUUID();
+
+        when(clienteFraude.analisarRisco(idCliente, idSolicitacao)).thenThrow(new RuntimeException("API indisponível"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> adaptador.analisarRisco(idCliente, idSolicitacao));
+    }
 }

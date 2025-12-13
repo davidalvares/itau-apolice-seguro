@@ -15,6 +15,8 @@ public class AdaptadorIntegracaoFraude implements PortaIntegracaoFraude {
     private final ClienteFraude clienteFraude;
 
     @Override
+    @io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker(name = "fraudeApi")
+    @io.github.resilience4j.retry.annotation.Retry(name = "fraudeApi")
     public RespostaAnaliseFraude analisarRisco(UUID idCliente, UUID idSolicitacao) {
         return clienteFraude.analisarRisco(idCliente, idSolicitacao);
     }

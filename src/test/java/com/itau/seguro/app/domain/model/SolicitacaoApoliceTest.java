@@ -26,7 +26,7 @@ class SolicitacaoApoliceTest {
     @DisplayName("AtualizarStatus deve adicionar histórico e atualizar estado")
     void deveAtualizarStatusCorretamente() {
         SolicitacaoApolice apolice = new SolicitacaoApolice();
-        apolice.prePersist(); // Inicializa histórico
+        apolice.prePersist();
 
         apolice.atualizarStatus(StatusSolicitacao.PENDENTE);
 

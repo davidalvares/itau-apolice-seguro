@@ -53,15 +53,30 @@ O coração do sistema é o motor de validação. Dependendo da classificação 
 
 ---
 
-## 🛠️ Tech Stack
-
-*   **Java 17 & Spring Boot 3**: Performance e produtividade.
-*   **MySQL**: Persistência relacional robusta.
-*   **Apache Kafka**: Backbone de eventos para pagamentos e subscrição.
-*   **OpenFeign**: Cliente HTTP declarativo para integração com API de Fraudes.
-*   **Docker Compose**: Ambiente de desenvolvimento completo em um comando.
-
 ---
+ 
+ ## 🛠️ Tech Stack & Resiliência
+ 
+ *   **Java 17 & Spring Boot 3**: Performance e produtividade.
+ *   **MySQL**: Persistência relacional robusta.
+ *   **Apache Kafka**: Backbone de eventos para pagamentos e subscrição.
+ *   **OpenFeign**: Cliente HTTP declarativo para integração com API de Fraudes.
+ *   **Resilience4j**: Circuit Breaker e Retry para tolerância a falhas na integração de fraude.
+ *   **Docker Compose**: Ambiente de desenvolvimento completo em um comando.
+ 
+ ### 🛡️ Padrões de Resiliência e Concorrência Implementados
+ 
+ 1.  **Circuit Breaker (Resilience4j)**:
+     *   Protege o sistema contra falhas em cascata caso a API de Fraude fique indisponível.
+     *   **Fallback**: Se o serviço de fraude cair, a apólice entra em estado `EM_ANALISE_MANUAL`, garantindo que nenhuma solicitação seja perdida.
+ 
+ 2.  **Retry Inteligente**:
+     *   O sistema tenta reprocessar chamadas falhas (ex: timeouts temporários) até 3 vezes antes de acionar o Circuit Breaker.
+ 
+ 3.  **Optimistic Locking (@Version)**:
+     *   Implementado na entidade `SolicitacaoApolice` para prevenir conflitos de atualização simultânea (ex: eventos de pagamento e subscrição chegando no mesmo milissegundo).
+ 
+ ---
 
 ## 🚀 Como Rodar
 

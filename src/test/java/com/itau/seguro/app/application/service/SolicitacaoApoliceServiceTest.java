@@ -49,7 +49,6 @@ class SolicitacaoApoliceServiceTest {
         @Test
         @DisplayName("Deve criar solicitação com sucesso e status PENDENTE quando validado")
         void deveCriarSolicitacaoComSucesso() {
-                // Arrange
                 UUID idCliente = UUID.randomUUID();
                 CriarSolicitacaoDTO dto = new CriarSolicitacaoDTO(
                                 idCliente, "prod1", CategoriaProduto.AUTO, CanalVenda.MOBILE,
@@ -62,9 +61,6 @@ class SolicitacaoApoliceServiceTest {
                                 .idCliente(dto.idCliente())
                                 .status(StatusSolicitacao.RECEBIDO)
                                 .build();
-
-                // Mocking save to return the same instance to simulate JPA behavior loosely but
-                // we capture the state changes
                 when(repositorio.save(any(SolicitacaoApolice.class))).thenReturn(apoliceSalva);
 
                 when(portaIntegracaoFraude.analisarRisco(any(), any())).thenReturn(new RespostaAnaliseFraude(
@@ -72,17 +68,13 @@ class SolicitacaoApoliceServiceTest {
                                 dto.idCliente(), LocalDateTime.now(), "REGULAR", Collections.emptyList()));
                 when(servicoValidacao.validar(any(), eq("REGULAR"))).thenReturn(true);
 
-                // Act
                 SolicitacaoResponseDTO response = service.criar(dto);
 
-                // Assert
                 assertNotNull(response);
                 assertEquals(apoliceSalva.getId(), response.id());
 
-                // Verify final state
                 assertEquals(StatusSolicitacao.PENDENTE, apoliceSalva.getStatus());
 
-                // Verify interactions
                 verify(repositorio, atLeast(2)).save(any(SolicitacaoApolice.class));
                 verify(produtorEventos, atLeast(1)).publicarMudancaEstado(any(EventoMudancaEstadoApolice.class));
         }
@@ -110,6 +102,30 @@ class SolicitacaoApoliceServiceTest {
                 service.criar(dto);
 
                 assertEquals(StatusSolicitacao.REJEITADO, apoliceSalva.getStatus());
+                verify(repositorio, atLeast(2)).save(any(SolicitacaoApolice.class));
+        }
+
+        @Test
+        @DisplayName("Deve encaminhar para análise manual quando validação falha com exceção")
+        void deveEncaminharParaAnaliseManualQuandoFalhaValidacao() {
+                CriarSolicitacaoDTO dto = new CriarSolicitacaoDTO(
+                                UUID.randomUUID(), "prod1", CategoriaProduto.AUTO, CanalVenda.MOBILE,
+                                FormaPagamento.CARTAO_CREDITO,
+                                BigDecimal.TEN, BigDecimal.valueOf(10000), Collections.emptyMap(),
+                                Collections.emptyList());
+
+                SolicitacaoApolice apoliceSalva = SolicitacaoApolice.builder()
+                                .id(UUID.randomUUID())
+                                .status(StatusSolicitacao.RECEBIDO)
+                                .build();
+
+                when(repositorio.save(any(SolicitacaoApolice.class))).thenReturn(apoliceSalva);
+                when(portaIntegracaoFraude.analisarRisco(any(), any()))
+                                .thenThrow(new RuntimeException("Erro integração"));
+
+                service.criar(dto);
+
+                assertEquals(StatusSolicitacao.EM_ANALISE_MANUAL, apoliceSalva.getStatus());
                 verify(repositorio, atLeast(2)).save(any(SolicitacaoApolice.class));
         }
 
@@ -165,14 +181,12 @@ class SolicitacaoApoliceServiceTest {
 
                 when(repositorio.findById(idApolice)).thenReturn(Optional.of(apolice));
 
-                // Act - Simula evento de subscrição
                 service.processarAutorizacaoSubscricao(idApolice, true);
 
-                // Assert
                 assertTrue(apolice.isSubscrito());
                 assertEquals(StatusSolicitacao.APROVADO, apolice.getStatus());
                 verify(repositorio, times(2)).save(apolice); // Salva subscrito, depois salva aprovado
-                // Deve publicar evento de APROVADO
+
                 verify(produtorEventos, atLeastOnce())
                                 .publicarMudancaEstado(argThat(e -> e.getStatus() == StatusSolicitacao.APROVADO));
         }

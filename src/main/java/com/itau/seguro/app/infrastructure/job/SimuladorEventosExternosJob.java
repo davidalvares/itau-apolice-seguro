@@ -23,7 +23,7 @@ public class SimuladorEventosExternosJob {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final Random random = new Random();
 
-    @Scheduled(fixedDelay = 10000)
+    @Scheduled(fixedDelay = 5000)
     public void executar() {
         List<SolicitacaoApolice> pendentes = repository.findByStatus(StatusSolicitacao.PENDENTE);
 
@@ -43,8 +43,7 @@ public class SimuladorEventosExternosJob {
     }
 
     private void processarApolice(SolicitacaoApolice apolice) {
-        // Simula processamento assíncrono, não age em todas as execuções para parecer
-        // mais real
+
         if (random.nextInt(10) < 3) {
             log.debug("Pulando simulação para apólice {} nesta execução para variar tempo.", apolice.getId());
             return;

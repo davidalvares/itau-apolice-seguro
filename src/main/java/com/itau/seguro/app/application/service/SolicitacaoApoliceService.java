@@ -122,13 +122,13 @@ public class SolicitacaoApoliceService {
 
             if (valido) {
                 atualizarStatus(entidade, StatusSolicitacao.VALIDADO);
-                // Auto-transição para PENDENTE conforme requisitos
                 atualizarStatus(entidade, StatusSolicitacao.PENDENTE);
             } else {
                 atualizarStatus(entidade, StatusSolicitacao.REJEITADO);
             }
         } catch (Exception e) {
-            log.error("Erro durante validação", e);
+            log.error("Erro durante validação - Integração indisponível ou falha", e);
+            atualizarStatus(entidade, StatusSolicitacao.EM_ANALISE_MANUAL);
         }
     }
 

@@ -6,5 +6,6 @@ public enum StatusSolicitacao {
     PENDENTE,
     APROVADO,
     REJEITADO,
-    CANCELADO
+    CANCELADO,
+    EM_ANALISE_MANUAL
 }

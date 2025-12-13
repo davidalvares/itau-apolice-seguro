@@ -9,5 +9,5 @@ import java.util.UUID;
 @NoArgsConstructor
 public class EventoSubscricao {
     private UUID idApolice;
-    private String status; // AUTHORIZED, DENIED
+    private String status;
 }

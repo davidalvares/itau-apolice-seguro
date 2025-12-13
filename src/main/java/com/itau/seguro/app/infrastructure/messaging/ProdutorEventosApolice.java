@@ -12,8 +12,7 @@ import org.springframework.stereotype.Component;
 public class ProdutorEventosApolice {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
-    private static final String TOPICO = "policy-events"; // Manter tópico ou traduzir? Manter para consistencia com
-                                                          // consumers externos, mas no código é TOPICO
+    private static final String TOPICO = "policy-events";
 
     public void publicarMudancaEstado(EventoMudancaEstadoApolice evento) {
         log.info("Publicando evento: {}", evento);

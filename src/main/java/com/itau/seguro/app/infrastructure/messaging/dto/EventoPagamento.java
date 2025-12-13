@@ -9,6 +9,5 @@ import java.util.UUID;
 @NoArgsConstructor
 public class EventoPagamento {
     private UUID idApolice;
-    private String status; // CONFIRMED, REJECTED (Manter valores de status técnicos em ingles ou enum?)
-                           // Keeping string for now but mapping logic might change.
+    private String status;
 }

@@ -3,6 +3,8 @@ package com.itau.seguro.app.infrastructure.job;
 import com.itau.seguro.app.domain.model.SolicitacaoApolice;
 import com.itau.seguro.app.domain.model.StatusSolicitacao;
 import com.itau.seguro.app.infrastructure.persistence.SolicitacaoApoliceRepository;
+import com.itau.seguro.app.infrastructure.messaging.dto.EventoPagamento;
+import com.itau.seguro.app.infrastructure.messaging.dto.EventoSubscricao;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,8 +47,8 @@ class SimuladorEventosExternosJobTest {
     }
 
     @Test
-    @DisplayName("Deve processar apólices encontradas (validação de fluxo)")
-    void deveProcessarApolices() throws NoSuchFieldException, IllegalAccessException {
+    @DisplayName("Deve simular pagamento com sucesso")
+    void deveSimularPagamentoSucesso() throws NoSuchFieldException, IllegalAccessException {
         SolicitacaoApolice apolice = SolicitacaoApolice.builder()
                 .id(UUID.randomUUID())
                 .status(StatusSolicitacao.PENDENTE)
@@ -55,14 +57,9 @@ class SimuladorEventosExternosJobTest {
 
         when(repository.findByStatus(StatusSolicitacao.PENDENTE)).thenReturn(List.of(apolice));
 
-        // Inject deterministic Random to force execution (skip logic < 3)
-        // We want nextInt(10) to be >= 3 to proceed.
-        // And for payment (nextInt(10) < 8) to be true/false.
         Random mockRandom = mock(Random.class);
 
-        // 1. Check if skipped (nextInt(10) < 3) -> return 5 (not skipped)
-        // 2. Check payment success (nextInt(10) < 8) -> return 0 (success)
-        when(mockRandom.nextInt(10)).thenReturn(5, 0);
+        when(mockRandom.nextInt(10)).thenReturn(5, 5);
 
         Field randomField = SimuladorEventosExternosJob.class.getDeclaredField("random");
         randomField.setAccessible(true);
@@ -70,6 +67,57 @@ class SimuladorEventosExternosJobTest {
 
         job.executar();
 
-        verify(kafkaTemplate).send(eq("payment-events"), eq(apolice.getId().toString()), any());
+        verify(kafkaTemplate).send(eq("payment-events"), eq(apolice.getId().toString()), any(EventoPagamento.class));
+    }
+
+    @Test
+    @DisplayName("Deve simular pagamento rejeitado")
+    void deveSimularPagamentoRejeitado() throws NoSuchFieldException, IllegalAccessException {
+        SolicitacaoApolice apolice = SolicitacaoApolice.builder()
+                .id(UUID.randomUUID())
+                .status(StatusSolicitacao.PENDENTE)
+                .pago(false)
+                .build();
+
+        when(repository.findByStatus(StatusSolicitacao.PENDENTE)).thenReturn(List.of(apolice));
+
+        Random mockRandom = mock(Random.class);
+
+        when(mockRandom.nextInt(10)).thenReturn(5, 9);
+
+        Field randomField = SimuladorEventosExternosJob.class.getDeclaredField("random");
+        randomField.setAccessible(true);
+        randomField.set(job, mockRandom);
+
+        job.executar();
+
+        verify(kafkaTemplate).send(eq("payment-events"), eq(apolice.getId().toString()), argThat(
+                evt -> evt instanceof EventoPagamento && "REJECTED".equals(((EventoPagamento) evt).getStatus())));
+    }
+
+    @Test
+    @DisplayName("Deve simular subscrição quando já pago")
+    void deveSimularSubscricao() throws NoSuchFieldException, IllegalAccessException {
+        SolicitacaoApolice apolice = SolicitacaoApolice.builder()
+                .id(UUID.randomUUID())
+                .status(StatusSolicitacao.PENDENTE)
+                .pago(true)
+                .subscrito(false)
+                .build();
+
+        when(repository.findByStatus(StatusSolicitacao.PENDENTE)).thenReturn(List.of(apolice));
+
+        Random mockRandom = mock(Random.class);
+
+        when(mockRandom.nextInt(10)).thenReturn(5, 5);
+
+        Field randomField = SimuladorEventosExternosJob.class.getDeclaredField("random");
+        randomField.setAccessible(true);
+        randomField.set(job, mockRandom);
+
+        job.executar();
+
+        verify(kafkaTemplate).send(eq("subscription-events"), eq(apolice.getId().toString()),
+                any(EventoSubscricao.class));
     }
 }

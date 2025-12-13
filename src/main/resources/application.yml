@@ -31,3 +31,18 @@ server:
 integration:
   fraud-api:
     url: http://localhost:1080
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      fraudeApi:
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+  retry:
+    instances:
+      fraudeApi:
+        maxRetryAttempts: 3
+        waitDuration: 1s

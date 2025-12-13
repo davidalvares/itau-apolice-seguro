@@ -24,6 +24,9 @@ public class SolicitacaoApolice {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Version
+    private Long version;
+
     @Column(nullable = false)
     private UUID idCliente;
 
